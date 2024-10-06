@@ -1,0 +1,114 @@
+Q No. 02
+
+Create an autoencoder to clean noisy speech signals. The model should aim to reconstruct clear speech from noisy audio recordings.
+
+import numpy as np
+import os
+from os import walk
+import soundfile
+import librosa
+import librosa.display
+
+import matplotlib.pyplot as plt
+import random
+from tensorflow import keras
+from keras import layers
+from sklearn.model_selection import train_test_split
+import IPython.display as ipd
+def get_filepaths(directory = "audio-mnist/data"):
+filepaths = []
+for root, dirs, files in os.walk("audio-mnist/data", topdown=False):
+for name in files:
+filepaths.append(os.path.join(root, name))
+
+if directory == "audio-mnist/data":
+filepaths = filepaths[:-1]
+
+return filepaths
+S_noisy = np.abs(librosa.stft(data_noisy, n_fft=1024))
+def get_spectrogram_features(filepaths, noise_gain = 1, sample_rate = 22050,
+duration_s = 1):
+X_clean = []
+X_noisy = []
+
+duration = int(sample_rate * duration_s)
+
+for filepath in filepaths:
+
+data, _ = librosa.load(filepath, sr = sample_rate)
+
+if len(data) < sample_rate:
+max_offset = np.abs(len(data) - duration)
+offset = np.random.randint(max_offset)
+data = np.pad(data, (offset, duration-len(data)-offset), "constant")
+
+elif len(data) > sample_rate:
+max_offset = np.abs(len(data) - duration)
+offset = np.random.randint(max_offset)
+data = data[offset:len(data)-max_offset+offset]
+
+else:
+offset = 0
+
+S = np.abs(librosa.stft(data, n_fft=2048))[:-1,:]
+X_clean.append(S)
+
+RMS=np.sqrt(np.mean(np.abs(data**2)))
+noise=np.random.normal(0, RMS, data.shape[0])
+data_noisy = data+noise
+S_noisy = np.abs(librosa.stft(data_noisy, n_fft=2048))[:-1,:]
+X_noisy.append(S_noisy)
+X_clean = np.array(X_clean)
+X_clean = np.expand_dims(X_clean, -1)
+X_noisy = np.array(X_noisy)
+X_noisy = np.expand_dims(X_noisy, -1)
+
+return X_clean, X_noisy
+class ZeroOneNorm():
+
+def init (self):
+self.data_to_fit = []
+self.data_to_transform = []
+def fit(self, data_to_fit):
+self.fitting_constant = np.max(np.abs(data_to_fit))
+def normalize(self, data_to_transform):
+normalized_data = data_to_transform / self.fitting_constant
+return normalized_data
+def denormalize(self, data_to_transform):
+denormalized_data = data_to_transform * self.fitting_constant
+return denormalized_data
+N = ZeroOneNorm()
+N.fit(X_noisy)
+X_clean_n = N.normalize(X_clean)
+X_noisy_n = N.normalize(X_noisy)
+
+x_train, x_test, y_train, y_test = train_test_split(X_noisy_n, X_clean_n,
+test_size = 0.2)
+
+my_callbacks = [keras.callbacks.EarlyStopping(patience=5),
+
+keras.callbacks.ReduceLROnPlateau(monitor="loss", patience=3),
+]
+opt = keras.optimizers.Adam(learning_rate=0.001)
+autoencoder.compile(optimizer=opt, loss='binary_crossentropy')
+history = autoencoder.fit(x_train, y_train,
+
+epochs=25,
+shuffle=True,
+validation_data=(x_test, y_test),
+
+verbose = 1,
+callbacks = my_callbacks
+)
+
+spec = N.denormalize(clean.reshape(spec_shape))
+spec_inv = librosa.griffinlim(spec)
+soundfile.write('clean.wav',spec_inv, sample_rate)
+
+spec = N.denormalize(noisy.reshape(spec_shape))
+spec_inv = librosa.griffinlim(spec)
+soundfile.write('noisy.wav', spec_inv, sample_rate)
+
+spec = N.denormalize(denoised.reshape(spec_shape))
+spec_inv = librosa.griffinlim(spec)
+soundfile.write('denoised.wav', spec_inv, sample_rate)
